@@ -1,4 +1,5 @@
 """Cleaning script for the EU life expectancy data"""
+
 import argparse
 from pathlib import Path
 
@@ -27,7 +28,9 @@ def clean_data(country: str = "PT") -> None:
     long = long.dropna(subset=["value"])
 
     country_data = long[long["region"] == country]
-    country_data.to_csv(DATA_DIR / f"{country.lower()}_life_expectancy.csv", index=False)
+    country_data.to_csv(
+        DATA_DIR / f"{country.lower()}_life_expectancy.csv", index=False
+    )
 
 
 def parse_args(argv: list = None) -> argparse.Namespace:

@@ -17,7 +17,7 @@ build-backend = "setuptools.build_meta"
 packages = ["life_expectancy"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pylint", "pytest-cov", "toml", "setuptools<81"]
+dev = ["pytest", "pylint", "pre-commit", "pytest-cov", "toml", "setuptools<81"]
 
 [tool.coverage.run]
 omit = [
