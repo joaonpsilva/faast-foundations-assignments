@@ -49,7 +49,7 @@ def clean_data(raw: pd.DataFrame, country: str = DEFAULT_COUNTRY) -> pd.DataFram
     return cleaned[cleaned["region"] == country]
 
 
-def parse_args(argv: list = None) -> argparse.Namespace:
+def parse_args(argv: list | None = None) -> argparse.Namespace:
     """Parse the command-line options"""
     parser = argparse.ArgumentParser(description="Clean the EU life expectancy data")
     parser.add_argument(
