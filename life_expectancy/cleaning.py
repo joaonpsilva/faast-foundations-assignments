@@ -1,46 +1,72 @@
 """Cleaning script for the EU life expectancy data"""
 
 import argparse
-from pathlib import Path
 
 import pandas as pd
 
-DATA_DIR = Path(__file__).parent / "data"
+from life_expectancy.data_io import DATA_DIR, load_data, save_data
+
+DEFAULT_COUNTRY = "PT"
+ID_COLUMNS = ["unit", "sex", "age", "region"]
+COMBINED_COLUMNS_SEPARATOR = ","
+# A number optionally followed by flags (e.g. "79.4 p")
+NUMERIC_PATTERN = r"(\d+\.?\d*)"
 
 
-def clean_data(country: str = "PT") -> None:
-    """Load the raw EU data, keep the rows of `country` in long format and save them as CSV"""
-    raw = pd.read_csv(DATA_DIR / "eu_life_expectancy_raw.tsv", sep="\t")
-
-    first_col = raw.columns[0]
-    raw[["unit", "sex", "age", "region"]] = raw[first_col].str.split(",", expand=True)
-
-    long = raw.drop(columns=first_col).melt(
-        id_vars=["unit", "sex", "age", "region"],
-        var_name="year",
-        value_name="value",
+def _split_combined_column(raw: pd.DataFrame) -> pd.DataFrame:
+    """Split the first column, which holds comma-separated ids, into `ID_COLUMNS`"""
+    combined_column = raw.columns[0]
+    split = raw.copy()
+    split[ID_COLUMNS] = split[combined_column].str.split(
+        COMBINED_COLUMNS_SEPARATOR, expand=True
     )
+    return split.drop(columns=combined_column)
 
-    long["year"] = long["year"].str.strip().astype(int)
+
+def _to_long_format(wide: pd.DataFrame) -> pd.DataFrame:
+    """Turn the year columns into `year` and `value` rows"""
+    return wide.melt(id_vars=ID_COLUMNS, var_name="year", value_name="value")
+
+
+def _clean_types_and_values(long: pd.DataFrame) -> pd.DataFrame:
+    """Convert years and values to numbers and drop rows without a value"""
+    cleaned = long.copy()
+    cleaned["year"] = cleaned["year"].str.strip().astype(int)
     # Values may carry flags (e.g. "79.4 p"); keep only the numeric part
-    long["value"] = long["value"].astype(str).str.extract(r"(\d+\.?\d*)", expand=False)
-    long["value"] = long["value"].astype(float)
-    long = long.dropna(subset=["value"])
-
-    country_data = long[long["region"] == country]
-    country_data.to_csv(
-        DATA_DIR / f"{country.lower()}_life_expectancy.csv", index=False
+    cleaned["value"] = (
+        cleaned["value"]
+        .astype(str)
+        .str.extract(NUMERIC_PATTERN, expand=False)
+        .astype(float)
     )
+    return cleaned.dropna(subset=["value"])
 
 
-def parse_args(argv: list = None) -> argparse.Namespace:
+def clean_data(raw: pd.DataFrame, country: str = DEFAULT_COUNTRY) -> pd.DataFrame:
+    """Convert the raw EU data to long format, keeping only the rows of `country`"""
+    long = _to_long_format(_split_combined_column(raw))
+    cleaned = _clean_types_and_values(long)
+    return cleaned[cleaned["region"] == country]
+
+
+def parse_args(argv: list | None = None) -> argparse.Namespace:
     """Parse the command-line options"""
     parser = argparse.ArgumentParser(description="Clean the EU life expectancy data")
     parser.add_argument(
-        "-c", "--country", default="PT", help="region code to keep (default: PT)"
+        "-c",
+        "--country",
+        default=DEFAULT_COUNTRY,
+        help=f"region code to keep (default: {DEFAULT_COUNTRY})",
     )
     return parser.parse_args(argv)
 
 
+def main(country: str = DEFAULT_COUNTRY) -> None:
+    """Load the raw data, clean it for `country` and save the result as CSV"""
+    raw = load_data()
+    cleaned = clean_data(raw, country)
+    save_data(cleaned, DATA_DIR / f"{country.lower()}_life_expectancy.csv")
+
+
 if __name__ == "__main__":  # pragma: no cover
-    clean_data(parse_args().country)
+    main(parse_args().country)
