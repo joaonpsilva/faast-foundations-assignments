@@ -5,14 +5,13 @@ from pathlib import Path
 
 import pandas as pd
 
-DATA_DIR = Path(__file__).parent / "data"
+from .loading import DATA_DIR, load_data, save_data
 
 
-def clean_data(country: str = "PT") -> None:
-    """Load the raw EU data, keep the rows of `country` in long format and save them as CSV"""
-    raw = pd.read_csv(DATA_DIR / "eu_life_expectancy_raw.tsv", sep="\t")
-
+def clean_data(raw: pd.DataFrame, country: str = "PT") -> pd.DataFrame:
+    """Return the rows of `country` from the raw EU data in long format"""
     first_col = raw.columns[0]
+    raw = raw.copy()
     raw[["unit", "sex", "age", "region"]] = raw[first_col].str.split(",", expand=True)
 
     long = raw.drop(columns=first_col).melt(
@@ -27,10 +26,18 @@ def clean_data(country: str = "PT") -> None:
     long["value"] = long["value"].astype(float)
     long = long.dropna(subset=["value"])
 
-    country_data = long[long["region"] == country]
-    country_data.to_csv(
-        DATA_DIR / f"{country.lower()}_life_expectancy.csv", index=False
-    )
+    return long[long["region"] == country].reset_index(drop=True)
+
+
+def main(
+    country: str = "PT",
+    input_path: Path = DATA_DIR / "eu_life_expectancy_raw.tsv",
+    output_dir: Path = DATA_DIR,
+) -> pd.DataFrame:
+    """Load, clean and save the data, returning the cleaned DataFrame"""
+    cleaned = clean_data(load_data(input_path), country)
+    save_data(cleaned, output_dir / f"{country.lower()}_life_expectancy.csv")
+    return cleaned
 
 
 def parse_args(argv: list = None) -> argparse.Namespace:
@@ -43,4 +50,4 @@ def parse_args(argv: list = None) -> argparse.Namespace:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    clean_data(parse_args().country)
+    main(parse_args().country)

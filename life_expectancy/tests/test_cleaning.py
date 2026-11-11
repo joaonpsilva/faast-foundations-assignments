@@ -1,30 +1,37 @@
 """Tests for the cleaning module"""
 
+from unittest.mock import patch
+
 import pandas as pd
 
-from life_expectancy.cleaning import clean_data, parse_args
-from . import OUTPUT_DIR
+from life_expectancy.cleaning import clean_data, main, parse_args
+from . import FIXTURES_DIR
 
 
-def test_clean_data(pt_life_expectancy_expected):
-    """Run the `clean_data` function and compare the output to the expected output"""
-    clean_data()
-    pt_life_expectancy_actual = pd.read_csv(OUTPUT_DIR / "pt_life_expectancy.csv")
-    pd.testing.assert_frame_equal(
-        pt_life_expectancy_actual, pt_life_expectancy_expected
-    )
+def test_clean_data(eu_life_expectancy_raw, pt_life_expectancy_expected):
+    """Cleaning the raw sample gives the expected PT output"""
+    actual = clean_data(eu_life_expectancy_raw)
+    pd.testing.assert_frame_equal(actual, pt_life_expectancy_expected)
 
 
-def test_clean_data_other_country():
-    """Only rows of the requested country are saved"""
-    output = OUTPUT_DIR / "fr_life_expectancy.csv"
-    try:
-        clean_data("FR")
-        actual = pd.read_csv(output)
-    finally:
-        output.unlink(missing_ok=True)
-    assert not actual.empty
-    assert set(actual["region"]) == {"FR"}
+def test_clean_data_other_country(eu_life_expectancy_raw, eu_life_expectancy_expected):
+    """Only rows of the requested country are kept, flags are stripped"""
+    actual = clean_data(eu_life_expectancy_raw, "FR")
+    expected = eu_life_expectancy_expected[
+        eu_life_expectancy_expected["region"] == "FR"
+    ].reset_index(drop=True)
+    pd.testing.assert_frame_equal(actual, expected)
+
+
+def test_main(pt_life_expectancy_expected):
+    """`main` returns the cleaned data and saves it without touching real files"""
+    with patch("pandas.DataFrame.to_csv") as to_csv_mock:
+        actual = main(
+            input_path=FIXTURES_DIR / "eu_life_expectancy_raw.tsv",
+            output_dir=FIXTURES_DIR,
+        )
+    to_csv_mock.assert_called_once()
+    pd.testing.assert_frame_equal(actual, pt_life_expectancy_expected)
 
 
 def test_parse_args_default():
