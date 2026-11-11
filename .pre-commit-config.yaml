@@ -10,7 +10,7 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: pylint life_expectancy.cleaning
+        entry: pylint life_expectancy.cleaning life_expectancy.data_io
         language: system
         files: ^life_expectancy/.*\.py$
         pass_filenames: false

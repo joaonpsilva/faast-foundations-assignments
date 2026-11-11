@@ -10,13 +10,13 @@ from . import FIXTURES_DIR
 
 def test_clean_data(eu_life_expectancy_raw, pt_life_expectancy_expected):
     """Cleaning the raw sample gives the expected PT output"""
-    actual = clean_data(eu_life_expectancy_raw)
+    actual = clean_data(eu_life_expectancy_raw).reset_index(drop=True)
     pd.testing.assert_frame_equal(actual, pt_life_expectancy_expected)
 
 
 def test_clean_data_other_country(eu_life_expectancy_raw, eu_life_expectancy_expected):
     """Only rows of the requested country are kept, flags are stripped"""
-    actual = clean_data(eu_life_expectancy_raw, "FR")
+    actual = clean_data(eu_life_expectancy_raw, "FR").reset_index(drop=True)
     expected = eu_life_expectancy_expected[
         eu_life_expectancy_expected["region"] == "FR"
     ].reset_index(drop=True)
@@ -31,7 +31,9 @@ def test_main(pt_life_expectancy_expected):
             output_dir=FIXTURES_DIR,
         )
     to_csv_mock.assert_called_once()
-    pd.testing.assert_frame_equal(actual, pt_life_expectancy_expected)
+    pd.testing.assert_frame_equal(
+        actual.reset_index(drop=True), pt_life_expectancy_expected
+    )
 
 
 def test_parse_args_default():

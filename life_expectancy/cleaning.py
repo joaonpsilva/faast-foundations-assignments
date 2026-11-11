@@ -5,48 +5,72 @@ from pathlib import Path
 
 import pandas as pd
 
-from .loading import DATA_DIR, load_data, save_data
+from life_expectancy.data_io import DATA_DIR, RAW_DATA_FILE, load_data, save_data
+
+DEFAULT_COUNTRY = "PT"
+ID_COLUMNS = ["unit", "sex", "age", "region"]
+COMBINED_COLUMNS_SEPARATOR = ","
+# A number optionally followed by flags (e.g. "79.4 p")
+NUMERIC_PATTERN = r"(\d+\.?\d*)"
 
 
-def clean_data(raw: pd.DataFrame, country: str = "PT") -> pd.DataFrame:
-    """Return the rows of `country` from the raw EU data in long format"""
-    first_col = raw.columns[0]
-    raw = raw.copy()
-    raw[["unit", "sex", "age", "region"]] = raw[first_col].str.split(",", expand=True)
-
-    long = raw.drop(columns=first_col).melt(
-        id_vars=["unit", "sex", "age", "region"],
-        var_name="year",
-        value_name="value",
+def _split_combined_column(raw: pd.DataFrame) -> pd.DataFrame:
+    """Split the first column, which holds comma-separated ids, into `ID_COLUMNS`"""
+    combined_column = raw.columns[0]
+    split = raw.copy()
+    split[ID_COLUMNS] = split[combined_column].str.split(
+        COMBINED_COLUMNS_SEPARATOR, expand=True
     )
+    return split.drop(columns=combined_column)
 
-    long["year"] = long["year"].str.strip().astype(int)
+
+def _to_long_format(wide: pd.DataFrame) -> pd.DataFrame:
+    """Turn the year columns into `year` and `value` rows"""
+    return wide.melt(id_vars=ID_COLUMNS, var_name="year", value_name="value")
+
+
+def _clean_types_and_values(long: pd.DataFrame) -> pd.DataFrame:
+    """Convert years and values to numbers and drop rows without a value"""
+    cleaned = long.copy()
+    cleaned["year"] = cleaned["year"].str.strip().astype(int)
     # Values may carry flags (e.g. "79.4 p"); keep only the numeric part
-    long["value"] = long["value"].astype(str).str.extract(r"(\d+\.?\d*)", expand=False)
-    long["value"] = long["value"].astype(float)
-    long = long.dropna(subset=["value"])
-
-    return long[long["region"] == country].reset_index(drop=True)
-
-
-def main(
-    country: str = "PT",
-    input_path: Path = DATA_DIR / "eu_life_expectancy_raw.tsv",
-    output_dir: Path = DATA_DIR,
-) -> pd.DataFrame:
-    """Load, clean and save the data, returning the cleaned DataFrame"""
-    cleaned = clean_data(load_data(input_path), country)
-    save_data(cleaned, output_dir / f"{country.lower()}_life_expectancy.csv")
-    return cleaned
+    cleaned["value"] = (
+        cleaned["value"]
+        .astype(str)
+        .str.extract(NUMERIC_PATTERN, expand=False)
+        .astype(float)
+    )
+    return cleaned.dropna(subset=["value"])
 
 
-def parse_args(argv: list = None) -> argparse.Namespace:
+def clean_data(raw: pd.DataFrame, country: str = DEFAULT_COUNTRY) -> pd.DataFrame:
+    """Convert the raw EU data to long format, keeping only the rows of `country`"""
+    long = _to_long_format(_split_combined_column(raw))
+    cleaned = _clean_types_and_values(long)
+    return cleaned[cleaned["region"] == country]
+
+
+def parse_args(argv: list | None = None) -> argparse.Namespace:
     """Parse the command-line options"""
     parser = argparse.ArgumentParser(description="Clean the EU life expectancy data")
     parser.add_argument(
-        "-c", "--country", default="PT", help="region code to keep (default: PT)"
+        "-c",
+        "--country",
+        default=DEFAULT_COUNTRY,
+        help=f"region code to keep (default: {DEFAULT_COUNTRY})",
     )
     return parser.parse_args(argv)
+
+
+def main(
+    country: str = DEFAULT_COUNTRY,
+    input_path: Path = RAW_DATA_FILE,
+    output_dir: Path = DATA_DIR,
+) -> pd.DataFrame:
+    """Load the raw data, clean it for `country`, save it as CSV and return it"""
+    cleaned = clean_data(load_data(input_path), country)
+    save_data(cleaned, output_dir / f"{country.lower()}_life_expectancy.csv")
+    return cleaned
 
 
 if __name__ == "__main__":  # pragma: no cover

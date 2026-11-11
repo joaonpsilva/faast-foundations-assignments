@@ -1,11 +1,11 @@
-"""Tests for the loading module"""
+"""Tests for the data_io module"""
 
 from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
 
-from life_expectancy.loading import load_data, save_data
+from life_expectancy.data_io import load_data, save_data
 from . import FIXTURES_DIR
 
 
