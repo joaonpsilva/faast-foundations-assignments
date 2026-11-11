@@ -1,10 +1,11 @@
 """Cleaning script for the EU life expectancy data"""
 
 import argparse
+from pathlib import Path
 
 import pandas as pd
 
-from life_expectancy.data_io import DATA_DIR, load_data, save_data
+from life_expectancy.data_io import DATA_DIR, RAW_DATA_FILE, load_data, save_data
 
 DEFAULT_COUNTRY = "PT"
 ID_COLUMNS = ["unit", "sex", "age", "region"]
@@ -61,11 +62,15 @@ def parse_args(argv: list | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(country: str = DEFAULT_COUNTRY) -> None:
-    """Load the raw data, clean it for `country` and save the result as CSV"""
-    raw = load_data()
-    cleaned = clean_data(raw, country)
-    save_data(cleaned, DATA_DIR / f"{country.lower()}_life_expectancy.csv")
+def main(
+    country: str = DEFAULT_COUNTRY,
+    input_path: Path = RAW_DATA_FILE,
+    output_dir: Path = DATA_DIR,
+) -> pd.DataFrame:
+    """Load the raw data, clean it for `country`, save it as CSV and return it"""
+    cleaned = clean_data(load_data(input_path), country)
+    save_data(cleaned, output_dir / f"{country.lower()}_life_expectancy.csv")
+    return cleaned
 
 
 if __name__ == "__main__":  # pragma: no cover
