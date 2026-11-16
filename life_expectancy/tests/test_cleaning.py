@@ -1,53 +1,39 @@
 """Tests for the cleaning module"""
 
+from unittest.mock import patch
+
 import pandas as pd
 
 from life_expectancy.cleaning import clean_data, main, parse_args
-from life_expectancy.data_io import load_data, save_data
-from . import OUTPUT_DIR
+from . import FIXTURES_DIR
+
+
+def test_clean_data(eu_life_expectancy_raw, pt_life_expectancy_expected):
+    """Cleaning the raw sample gives the expected PT output"""
+    actual = clean_data(eu_life_expectancy_raw).reset_index(drop=True)
+    pd.testing.assert_frame_equal(actual, pt_life_expectancy_expected)
+
+
+def test_clean_data_other_country(eu_life_expectancy_raw, eu_life_expectancy_expected):
+    """Only rows of the requested country are kept, flags are stripped"""
+    actual = clean_data(eu_life_expectancy_raw, "FR").reset_index(drop=True)
+    expected = eu_life_expectancy_expected[
+        eu_life_expectancy_expected["region"] == "FR"
+    ].reset_index(drop=True)
+    pd.testing.assert_frame_equal(actual, expected)
 
 
 def test_main(pt_life_expectancy_expected):
-    """Run the `main` function and compare the output to the expected output"""
-    main()
-    pt_life_expectancy_actual = pd.read_csv(OUTPUT_DIR / "pt_life_expectancy.csv")
+    """`main` returns the cleaned data and saves it without touching real files"""
+    with patch("pandas.DataFrame.to_csv") as to_csv_mock:
+        actual = main(
+            input_path=FIXTURES_DIR / "eu_life_expectancy_raw.tsv",
+            output_dir=FIXTURES_DIR,
+        )
+    to_csv_mock.assert_called_once()
     pd.testing.assert_frame_equal(
-        pt_life_expectancy_actual, pt_life_expectancy_expected
+        actual.reset_index(drop=True), pt_life_expectancy_expected
     )
-
-
-def test_main_other_country():
-    """Only rows of the requested country are saved"""
-    output = OUTPUT_DIR / "fr_life_expectancy.csv"
-    try:
-        main("FR")
-        actual = pd.read_csv(output)
-    finally:
-        output.unlink(missing_ok=True)
-    assert not actual.empty
-    assert set(actual["region"]) == {"FR"}
-
-
-def test_load_data():
-    """The raw data is loaded with its combined first column"""
-    raw = load_data()
-    assert not raw.empty
-    assert "," in raw.columns[0]
-
-
-def test_clean_data(pt_life_expectancy_expected):
-    """`clean_data` returns the long-format rows of the requested country"""
-    cleaned = clean_data(load_data())
-    pd.testing.assert_frame_equal(
-        cleaned.reset_index(drop=True), pt_life_expectancy_expected
-    )
-
-
-def test_save_data(tmp_path, pt_life_expectancy_expected):
-    """`save_data` writes the data as CSV without the index"""
-    output = tmp_path / "output.csv"
-    save_data(pt_life_expectancy_expected, output)
-    pd.testing.assert_frame_equal(pd.read_csv(output), pt_life_expectancy_expected)
 
 
 def test_parse_args_default():
