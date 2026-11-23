@@ -6,8 +6,9 @@ from pathlib import Path
 import pandas as pd
 
 from life_expectancy.data_io import DATA_DIR, RAW_DATA_FILE, load_data, save_data
+from life_expectancy.region import Region
 
-DEFAULT_COUNTRY = "PT"
+DEFAULT_COUNTRY = Region.PT
 ID_COLUMNS = ["unit", "sex", "age", "region"]
 COMBINED_COLUMNS_SEPARATOR = ","
 # A number optionally followed by flags (e.g. "79.4 p")
@@ -43,11 +44,11 @@ def _clean_types_and_values(long: pd.DataFrame) -> pd.DataFrame:
     return cleaned.dropna(subset=["value"])
 
 
-def clean_data(raw: pd.DataFrame, country: str = DEFAULT_COUNTRY) -> pd.DataFrame:
+def clean_data(raw: pd.DataFrame, country: Region = DEFAULT_COUNTRY) -> pd.DataFrame:
     """Convert the raw EU data to long format, keeping only the rows of `country`"""
     long = _to_long_format(_split_combined_column(raw))
     cleaned = _clean_types_and_values(long)
-    return cleaned[cleaned["region"] == country]
+    return cleaned[cleaned["region"] == country.value]
 
 
 def parse_args(argv: list | None = None) -> argparse.Namespace:
@@ -56,20 +57,21 @@ def parse_args(argv: list | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-c",
         "--country",
+        type=Region,
         default=DEFAULT_COUNTRY,
-        help=f"region code to keep (default: {DEFAULT_COUNTRY})",
+        help=f"region code to keep (default: {DEFAULT_COUNTRY.value})",
     )
     return parser.parse_args(argv)
 
 
 def main(
-    country: str = DEFAULT_COUNTRY,
+    country: Region = DEFAULT_COUNTRY,
     input_path: Path = RAW_DATA_FILE,
     output_dir: Path = DATA_DIR,
 ) -> pd.DataFrame:
     """Load the raw data, clean it for `country`, save it as CSV and return it"""
     cleaned = clean_data(load_data(input_path), country)
-    save_data(cleaned, output_dir / f"{country.lower()}_life_expectancy.csv")
+    save_data(cleaned, output_dir / f"{country.value.lower()}_life_expectancy.csv")
     return cleaned
 
 
